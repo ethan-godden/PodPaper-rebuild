@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LEGACY = ROOT / "data" / "fixtures-legacy"
 LAYOUT_MODEL = "PaddlePaddle/PP-DocLayoutV3_safetensors"
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-LLM = "qwen3.8:27b"
+LLM = "qwen3.8:27b-q4_K_M"  # GGUF build: the default MLX tag refuses structured output
 OCR = "glm-ocr"
 
 
