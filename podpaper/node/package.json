@@ -1,0 +1,18 @@
+{
+  "name": "podpaper-mathspeak",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Batch CLI: LaTeX to MathML (MathJax 4) to rule-based speech (Speech Rule Engine). Offline at run time.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "mathspeak": "node mathspeak.mjs"
+  },
+  "dependencies": {
+    "@mathjax/src": "4.1.3",
+    "speech-rule-engine": "5.0.0-rc.4"
+  }
+}
