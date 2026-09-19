@@ -20,12 +20,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 SCHEMA_VERSION = 0
 
 Unit = Annotated[float, Field(ge=0.0, le=1.0)]
+Id = Annotated[str, Field(min_length=1)]
 
 
 class Model(BaseModel):
     """Base: reject unknown fields so schema drift fails loudly."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 # --------------------------------------------------------------------------- geometry
@@ -114,7 +115,7 @@ Span = Annotated[
 
 
 class Sentence(Model):
-    id: str
+    id: Id
     spans: list[Span]
 
 
@@ -172,10 +173,13 @@ class Confidence(Model):
 
 
 class Element(Model):
-    id: str
+    id: Id
     kind: Kind
     order: int = Field(ge=0, description="Position in the global reading order.")
-    prov: list[Prov] = Field(min_length=1)
+    prov: list[Prov] = Field(
+        default_factory=list,
+        description="Boxes on the page. Empty only in a geometry-free document (no pages).",
+    )
     source: Source
     confidence: Confidence = Field(default_factory=Confidence)
 
@@ -200,6 +204,10 @@ class Element(Model):
         default=None, description="Algorithm or code body, shown not read."
     )
 
+    description: str | None = Field(
+        default=None, description="Generated figure description (S6); never the caption."
+    )
+
     caption_id: str | None = Field(default=None, description="On a figure/table: its caption.")
     target_id: str | None = Field(default=None, description="On a caption: what it captions.")
 
@@ -220,7 +228,7 @@ class MathStats(Model):
 
 
 class Math(Model):
-    id: str
+    id: Id
     display: bool
     tex: str
     tex_norm: str | None = None
@@ -238,7 +246,7 @@ class Math(Model):
 
 
 class Section(Model):
-    id: str
+    id: Id
     title: str
     level: int = Field(ge=1)
     parent_id: str | None = None
@@ -246,7 +254,7 @@ class Section(Model):
 
 
 class BibEntry(Model):
-    id: str
+    id: Id
     text: str
     number: int | None = None
     element_id: str | None = None
@@ -266,10 +274,12 @@ class LexiconEntry(Model):
 
 class PaperDoc(Model):
     schema_version: Literal[0] = SCHEMA_VERSION
-    doc_id: str = Field(description="sha256 of the input PDF.")
+    doc_id: Id = Field(description="sha256 of the input PDF.")
     title: str | None = None
     arxiv_id: str | None = None
-    pages: list[Page]
+    pages: list[Page] = Field(
+        description="Empty for a geometry-free reference document (e.g. parsed from HTML)."
+    )
     elements: list[Element]
     math: dict[str, Math] = Field(default_factory=dict)
     sections: list[Section] = Field(default_factory=list)
@@ -304,7 +314,12 @@ class PaperDoc(Model):
             errors.append("pages must be listed with index = 0..n-1")
 
         section_ids = {s.id for s in self.sections}
+        if len(section_ids) != len(self.sections):
+            errors.append("section ids are not unique")
         bib_ids = {b.id for b in self.bibliography}
+        if len(bib_ids) != len(self.bibliography):
+            errors.append("bibliography ids are not unique")
+        by_id = {el.id: el for el in self.elements}
         sentence_ids: list[str] = []
 
         def need_element(owner: str, field: str, ref: str | None) -> None:
@@ -312,9 +327,15 @@ class PaperDoc(Model):
                 errors.append(f"{owner}.{field} -> unknown element {ref!r}")
 
         for el in self.elements:
+            if n_pages and not el.prov:
+                errors.append(f"{el.id}: needs at least one box in a document with pages")
             for p in el.prov:
                 if p.page >= n_pages:
                     errors.append(f"{el.id}: prov page {p.page} is out of range")
+            if el.continues_from == el.id:
+                errors.append(f"{el.id}: continues from itself")
+            if el.math_id in self.math and not self.math[el.math_id].display:
+                errors.append(f"{el.id}: display_math points at inline math {el.math_id!r}")
             need_element(el.id, "continues_from", el.continues_from)
             need_element(el.id, "caption_id", el.caption_id)
             need_element(el.id, "target_id", el.target_id)
@@ -329,6 +350,9 @@ class PaperDoc(Model):
                         errors.append(f"{s.id}: unknown math {span.math_id!r}")
                     elif isinstance(span, DisplayMathRef):
                         need_element(s.id, "display_math", span.element_id)
+                        target = by_id.get(span.element_id)
+                        if target is not None and target.kind is not Kind.DISPLAY_MATH:
+                            errors.append(f"{s.id}: {span.element_id!r} is not display math")
                     elif isinstance(span, XRef):
                         need_element(s.id, "xref", span.target_element_id)
                     elif isinstance(span, FootnoteMark):
@@ -341,9 +365,17 @@ class PaperDoc(Model):
         if len(set(sentence_ids)) != len(sentence_ids):
             errors.append("sentence ids are not unique")
 
+        parents = {s.id: s.parent_id for s in self.sections}
         for s in self.sections:
             if s.parent_id is not None and s.parent_id not in section_ids:
                 errors.append(f"section {s.id}: unknown parent {s.parent_id!r}")
+            seen, cur = {s.id}, s.parent_id
+            while cur is not None and cur in parents:
+                if cur in seen:
+                    errors.append(f"section {s.id}: parent chain loops")
+                    break
+                seen.add(cur)
+                cur = parents[cur]
             need_element(f"section {s.id}", "heading_element_id", s.heading_element_id)
         for row in self.glossary:
             need_element("glossary", "defined_in", row.defined_in)
@@ -382,9 +414,23 @@ class SrcMap(Model):
 
     start: int = Field(ge=0)
     end: int = Field(ge=0)
+    element_id: str | None = Field(
+        default=None,
+        description=(
+            "Element this range sits in, when it differs from the utterance's own element: "
+            "a sentence that runs through a flow group is owned by its first element, and "
+            "this says which element to highlight for each part."
+        ),
+    )
     sentence_id: str | None = None
     span_index: int | None = Field(default=None, ge=0)
     math_id: str | None = None
+
+    @model_validator(mode="after")
+    def _ordered(self) -> SrcMap:
+        if self.end < self.start:
+            raise ValueError("src_map end is before start")
+        return self
 
 
 class Verify(Model):
@@ -395,7 +441,13 @@ class Verify(Model):
 
 
 class Utterance(Model):
-    id: str
+    """One thing to say.
+
+    ``spoken`` must already be normalized: S7 has to map or strip the characters
+    ``\\ $ ^ _ { }`` (for example "$5" to "five dollars") before building an utterance.
+    """
+
+    id: Id
     element_id: str
     sentence_id: str | None = None
     kind: UtteranceKind
@@ -410,6 +462,10 @@ class Utterance(Model):
 
     @model_validator(mode="after")
     def _no_raw_latex(self) -> Utterance:
+        if not self.spoken.strip():
+            raise ValueError(f"{self.id}: spoken text is blank")
+        if self.alt_of == self.id:
+            raise ValueError(f"{self.id}: is an alternative of itself")
         bad = sorted(set(self.spoken) & set("\\$^_{}"))
         if bad:
             raise ValueError(f"{self.id}: spoken text contains LaTeX characters {bad}")
@@ -443,7 +499,7 @@ class NarrationPlan(Model):
 class AudioSegment(Model):
     """One audio file, normally one per section."""
 
-    id: str
+    id: Id
     section_id: str | None = None
     blob: str = Field(description="Content hash of the encoded audio.")
     sample_rate: int = Field(gt=0)
@@ -456,8 +512,16 @@ class WordTime(Model):
     start_sample: int = Field(ge=0)
     end_sample: int = Field(ge=0)
 
+    @model_validator(mode="after")
+    def _ordered(self) -> WordTime:
+        if self.char_end < self.char_start or self.end_sample < self.start_sample:
+            raise ValueError("word time runs backwards")
+        return self
+
 
 class UtteranceTime(Model):
+    """Sample positions, here and in ``words``, are relative to the start of the segment."""
+
     utterance_id: str
     segment_id: str
     start_sample: int = Field(ge=0)
@@ -468,6 +532,11 @@ class UtteranceTime(Model):
     def _ordered(self) -> UtteranceTime:
         if self.end_sample < self.start_sample:
             raise ValueError(f"{self.utterance_id}: end before start")
+        last = self.start_sample
+        for w in self.words:
+            if w.start_sample < last or w.end_sample > self.end_sample:
+                raise ValueError(f"{self.utterance_id}: word times are unordered or out of range")
+            last = w.end_sample
         return self
 
 
@@ -514,9 +583,13 @@ class Timeline(Model):
         for ev in self.reference_events:
             if ev.segment_id not in segs:
                 raise ValueError(f"reference event: unknown segment {ev.segment_id!r}")
+            if ev.at_sample > segs[ev.segment_id].n_samples:
+                raise ValueError("reference event: lies past the end of its segment")
         for ch in self.chapters:
             if ch.segment_id not in segs:
                 raise ValueError(f"chapter {ch.title!r}: unknown segment {ch.segment_id!r}")
+            if ch.start_sample > segs[ch.segment_id].n_samples:
+                raise ValueError(f"chapter {ch.title!r}: starts past the end of its segment")
         return self
 
 
