@@ -5,6 +5,10 @@ are excluded by default. Run with:
 
     uv sync --extra models
     uv run pytest -m models tests/smoke
+
+A missing prerequisite (package, weights, fixture, Ollama, model) skips the test. Set
+PODPAPER_SMOKE_STRICT=1 to make it fail instead; that is the M0 gate. Weights are only read
+from the local Hugging Face cache unless PODPAPER_SMOKE_DOWNLOAD=1 is set.
 """
 
 from __future__ import annotations
@@ -22,25 +26,68 @@ pytestmark = pytest.mark.models
 ROOT = Path(__file__).resolve().parents[2]
 LEGACY = ROOT / "data" / "fixtures-legacy"
 LAYOUT_MODEL = "PaddlePaddle/PP-DocLayoutV3_safetensors"
-OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+KOKORO_MODEL = "hexgrad/Kokoro-82M"
+STRICT = os.environ.get("PODPAPER_SMOKE_STRICT") == "1"
+DOWNLOAD = os.environ.get("PODPAPER_SMOKE_DOWNLOAD") == "1"
+
+
+def _ollama_url() -> str:
+    """OLLAMA_HOST follows Ollama's own convention: scheme and port are optional."""
+    host = os.environ.get("OLLAMA_HOST", "127.0.0.1:11434")
+    if "://" not in host:
+        host = f"http://{host}"
+    scheme, rest = host.split("://", 1)
+    if ":" not in rest:
+        rest = f"{rest}:11434"
+    return f"{scheme}://{rest.replace('0.0.0.0', '127.0.0.1')}"
+
+
+OLLAMA = _ollama_url()
+
+
+def missing(reason: str):
+    """A prerequisite is absent: skip, or fail when the run is the strict gate."""
+    if STRICT:
+        pytest.fail(reason)
+    pytest.skip(reason)
+
+
+def need(module: str):
+    try:
+        return __import__(module)
+    except ImportError:
+        missing(f"{module} is not installed (run `uv sync --extra models`)")
+
+
+def need_weights(repo_id: str) -> None:
+    if DOWNLOAD:
+        return
+    hub = need("huggingface_hub")
+    try:
+        hub.snapshot_download(repo_id, local_files_only=True)
+    except Exception:
+        missing(f"{repo_id} is not in the local cache (rerun with PODPAPER_SMOKE_DOWNLOAD=1)")
+
+
 LLM = "qwen3.8:27b-q4_K_M"  # GGUF build: the default MLX tag refuses structured output
 OCR = "glm-ocr"
 
 
 def test_torch_runs_on_mps() -> None:
-    torch = pytest.importorskip("torch")
+    torch = need("torch")
     assert torch.backends.mps.is_available()
     x = torch.randn(256, 256, device="mps")
     assert torch.isfinite((x @ x).sum()).item()
 
 
 def _legacy_page(index: int):
-    pdfium = pytest.importorskip("pypdfium2")
+    pdfium = need("pypdfium2")
     path = LEGACY / "test.pdf"
     if not path.exists():
-        pytest.skip("legacy fixtures are not present (see tests/fixtures/legacy/README.md)")
+        missing("legacy fixtures are not present (see tests/fixtures/legacy/README.md)")
     pdf = pdfium.PdfDocument(path)
     try:
+        assert len(pdf) == 140
         page = pdf[index]
         image = page.render(scale=200 / 72).to_pil().convert("RGB")
         text = page.get_textpage().get_text_range()
@@ -58,13 +105,16 @@ def test_pdf_renders_and_has_a_text_layer() -> None:
 
 @pytest.mark.parametrize("device", ["cpu", "mps"])
 def test_layout_model_detects_blocks_with_reading_order(device: str) -> None:
-    torch = pytest.importorskip("torch")
-    from transformers import AutoImageProcessor, AutoModelForObjectDetection
+    torch = need("torch")
+    transformers = need("transformers")
+    need_weights(LAYOUT_MODEL)
 
     image, _ = _legacy_page(9)
-    processor = AutoImageProcessor.from_pretrained(LAYOUT_MODEL)
-    model = AutoModelForObjectDetection.from_pretrained(LAYOUT_MODEL).to(device).eval()
+    processor = transformers.AutoImageProcessor.from_pretrained(LAYOUT_MODEL)
+    model = transformers.AutoModelForObjectDetection.from_pretrained(LAYOUT_MODEL)
+    model = model.to(device).eval()
     assert len(model.config.id2label) == 25
+    assert sum(name == "formula" for name in model.config.id2label.values()) == 2
 
     inputs = processor(images=image, return_tensors="pt").to(device)
     with torch.no_grad():
@@ -83,9 +133,10 @@ def test_layout_model_detects_blocks_with_reading_order(device: str) -> None:
 @pytest.mark.parametrize("device", ["cpu", "mps"])
 def test_kokoro_speaks_with_word_timestamps(device: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
-    kokoro = pytest.importorskip("kokoro")
+    kokoro = need("kokoro")
+    need_weights(KOKORO_MODEL)
 
-    pipeline = kokoro.KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M", device=device)
+    pipeline = kokoro.KPipeline(lang_code="a", repo_id=KOKORO_MODEL, device=device)
     results = list(pipeline("The energy equals m c squared.", voice="af_heart"))
 
     n_samples = sum(len(r.audio) for r in results)
@@ -96,15 +147,17 @@ def test_kokoro_speaks_with_word_timestamps(device: str, monkeypatch: pytest.Mon
 
 
 def _ollama(payload: dict) -> dict:
-    httpx = pytest.importorskip("httpx")
+    httpx = need("httpx")
     try:
         tags = httpx.get(f"{OLLAMA}/api/tags", timeout=5).json()
-    except httpx.HTTPError:
-        pytest.skip("Ollama is not running (start it with `ollama serve`)")
-    names = {m["name"] for m in tags["models"]}
+        names = {m["name"] for m in tags["models"]}
+    except httpx.TransportError:
+        missing(f"Ollama is not running at {OLLAMA} (start it with `ollama serve`)")
+    except (ValueError, KeyError, TypeError):
+        pytest.fail(f"{OLLAMA} answered, but not like an Ollama server")
     model = payload["model"]
     if model not in names and f"{model}:latest" not in names:
-        pytest.skip(f"model {model} is not pulled (run `ollama pull {model}`)")
+        missing(f"model {model} is not pulled (run `ollama pull {model}`)")
     response = httpx.post(f"{OLLAMA}/api/chat", json={**payload, "stream": False}, timeout=600)
     response.raise_for_status()
     return response.json()
@@ -160,3 +213,33 @@ def test_ocr_model_reads_a_rendered_page_region() -> None:
     )
     out = reply["message"]["content"]
     assert "Fermat" in out or "FERMAT" in out, out[:300]
+
+
+def test_llm_returns_schema_constrained_json_for_an_image() -> None:
+    """The plan needs vision and a JSON schema in the same call (figure descriptions)."""
+    image, _ = _legacy_page(0)
+    small = image.resize((image.width // 2, image.height // 2))
+    buffer = io.BytesIO()
+    small.save(buffer, format="PNG")
+    schema = {
+        "type": "object",
+        "properties": {"title": {"type": "string"}},
+        "required": ["title"],
+    }
+    reply = _ollama(
+        {
+            "model": LLM,
+            "think": False,
+            "format": schema,
+            "options": {"temperature": 0, "num_ctx": 8192},
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Give the title shown on this page.",
+                    "images": [base64.b64encode(buffer.getvalue()).decode()],
+                }
+            ],
+        }
+    )
+    data = json.loads(reply["message"]["content"])
+    assert "fermat" in data["title"].lower()
