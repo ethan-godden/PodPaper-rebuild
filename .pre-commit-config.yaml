@@ -1,26 +1,28 @@
-# Run with prek (https://github.com/j178/prek): `uv run prek install` once.
+# Run with prek (https://github.com/j178/prek): `uv run prek install` once (installs both hook types).
+# --frozen keeps hooks working offline: uv does not re-resolve or re-fetch anything.
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: local
     hooks:
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format --check
+        entry: uv run --frozen ruff format --check
         language: system
         types: [python]
       - id: ruff-check
         name: ruff check
-        entry: uv run ruff check
+        entry: uv run --frozen ruff check
         language: system
         types: [python]
       - id: ty
         name: ty check
-        entry: uv run ty check
+        entry: uv run --frozen ty check
         language: system
         types: [python]
         pass_filenames: false
       - id: pytest
         name: pytest (fast, no models)
-        entry: uv run pytest
+        entry: uv run --frozen pytest
         language: system
         pass_filenames: false
         stages: [pre-push]
