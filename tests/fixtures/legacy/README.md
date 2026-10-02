@@ -17,6 +17,7 @@ To restore them, clone the old repository and copy:
 | `Image to Latex/` | `image_to_latex/` | Formula and text recognition cases |
 | `testtext.PNG` | `testtext.PNG` | Text recognition case |
 | `TestFileConverted.mp3` | `TestFileConverted.mp3` | Reference for the old audio output |
+| `LICENSE` | `LICENSE` | The old MIT notice, kept with the files |
 | `TexToEnglish.py` | `TexToEnglish.py` | Mined for verbalizer test inputs, including ones that crashed it |
 
 Verify with:
