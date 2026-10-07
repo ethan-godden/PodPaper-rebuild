@@ -373,7 +373,7 @@ PodPaper/
 
 `align.py` is shared by the v1 splice, the data engine and S5b. The old 193 MB git history is not carried over. Code mined from the old repo keeps its MIT notice and credits its nine commit authors in `ATTRIBUTION.md`.
 
-Fixtures to copy from the old repo (a few MB): `resources/static_web_files/test.pdf`, root `latextext.txt`, `Image to Latex/Example Images/` with its `latextext.txt`, `testtext.PNG`, `TestFileConverted.mp3`. `TexToEnglish.py` is mined for test inputs, including the ones that crashed it. The read-only clone is at `/private/tmp/claude-501/-Users-ethangodden--claude-spares-spare-gmuVPk/08707853-2b2a-4b07-b032-e5d0fdaae642/scratchpad/podpaper-src`; it is in a temporary directory, so copy fixtures early.
+Fixtures to copy from the old repo (a few MB): `resources/static_web_files/test.pdf`, root `latextext.txt`, `Image to Latex/Example Images/` with its `latextext.txt`, `testtext.PNG`, `TestFileConverted.mp3`. `TexToEnglish.py` is mined for test inputs, including the ones that crashed it. They come from https://github.com/ethan-godden/PodPaper at commit `b966a89`; see `tests/fixtures/legacy/README.md`.
 
 ## Evaluation and golden set
 
