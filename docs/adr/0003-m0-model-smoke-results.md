@@ -26,7 +26,7 @@ kokoro (PyPI, with `en-core-web-sm` 3.8.0 pinned so it is not fetched at run tim
 | GLM-OCR (`glm-ocr`, Ollama, llama.cpp runner) | Reads the title page text from a rendered page crop. About 1.9 GB loaded. |
 | Qwen3.8-27B default tag (`qwen3.8:27b`) | This tag is an MLX build (nvfp4). Plain chat and `think: false` work. Any `format` value (JSON mode or a JSON schema) returns HTTP 501 "structured output is unavailable". |
 | Qwen3.8-27B GGUF (`qwen3.8:27b-q4_K_M`, llama.cpp runner) | Schema-constrained output works, including with one image attached and `think: false`. About 15 GB loaded at an 8K context. About 20 tokens per second generation in one run. |
-| Offline | Local-model smoke tests pass with `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1` and `uv run --offline`. Not yet tested with the network interface actually disabled. |
+| Offline | Local-model smoke tests pass with `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1` and `uv run --offline`. An independent reviewer also ran all smoke tests from a fresh clone in a sandbox that blocks non-localhost network, with `uv run --offline`; they passed. Plain `uv run` fails offline because uv tries to re-fetch the URL-pinned `en-core-web-sm` wheel, so use `--offline` or `--frozen`. |
 
 ## Decision
 
@@ -43,6 +43,8 @@ kokoro (PyPI, with `en-core-web-sm` 3.8.0 pinned so it is not fetched at run tim
   can be removed with `ollama rm qwen3.8:27b` if it is not wanted for free-text calls.
 - Ollama is started by hand (`ollama serve`); it is not installed as a login service.
 - Open for M1: which `formula` id is inline; throughput of each model;
-  a true network-off run; the 40k-token prompt test.
+  the 40k-token prompt test.
 
-Reproduce with `uv sync --extra models && uv run pytest -m models tests/smoke`.
+The MLX-tag 501 result and the timings were observed by hand; everything else in the table is asserted by the smoke tests.
+
+Reproduce with `uv sync --extra models && PODPAPER_SMOKE_STRICT=1 uv run pytest -m models tests/smoke`.
