@@ -208,7 +208,9 @@ def _run_batch(
                 proc.kill()
             proc.wait()
             reader.join(timeout=_EXIT_WAIT_S)
-            proc.stdout.close()
+            if not reader.is_alive():
+                # Closing while the reader is still blocked in read() would wait on its lock.
+                proc.stdout.close()
     return results
 
 
