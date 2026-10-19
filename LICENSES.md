@@ -37,6 +37,12 @@ PodPaper's own code is MIT (`LICENSE`). Attribution for the 2020 original is in 
 | uv (0.13.9) | Environment and lockfile | MIT OR Apache-2.0 | PyPI `uv`; brew `uv` | Yes | Yes | Notice | checked 2026-11-23 |
 | torch (2.15.0) | Framework for layout, speech, embeddings, training | PyPI licence expression for the wheel: `Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND ISC AND MIT AND Zlib` (PyTorch plus bundled parts; all permissive) | PyPI `torch` | Yes | Yes | Notices if the wheel is redistributed | checked 2026-11-23 |
 | transformers (5.24.0) | Model loading, layout inference, HF Trainer | Apache-2.0 | PyPI `transformers` | Yes | Yes | Notice; state changes | checked 2026-11-23 |
+| torchvision (0.29.2) | Image processor backend required by the PP-DocLayoutV3 transformers port | BSD-3-Clause (wheel metadata says "BSD") | Installed wheel metadata | Yes | Yes | Notice | metadata read 2026-11-23; LICENSE file not opened |
+| opencv-python-headless (5.1.0.95) | Polygon post-processing required by the PP-DocLayoutV3 transformers port | Apache-2.0; the wheel is reported to bundle LGPL FFmpeg libraries | Installed wheel metadata | Yes | Yes | Notice; LGPL terms for bundled libraries if redistributed | metadata read 2026-11-23; bundled libraries unverified |
+| pillow (13.0.0) | Image handling | MIT-CMU | Installed wheel metadata | Yes | Yes | Notice | metadata read 2026-11-23 |
+| soundfile (0.14.0) | Audio file writing | BSD-3-Clause; the wheel is reported to bundle libsndfile (LGPL-2.1) | Installed wheel metadata | Yes | Yes | Notice; LGPL terms for libsndfile if redistributed | metadata read 2026-11-23; bundled library unverified |
+| httpx (0.28.1) | HTTP client for the Ollama API | BSD-3-Clause | Installed wheel metadata | Yes | Yes | Notice | metadata read 2026-11-23 |
+| en-core-web-sm (3.8.0) | spaCy English pipeline that Kokoro's text front end loads | MIT (package metadata); licences of its training sources not checked | Installed wheel metadata | Yes | Yes | Notice | metadata read 2026-11-23 |
 | peft (0.22.0) | LoRA, only if a verbalizer larger than 0.8B is trained | Apache-2.0 | PyPI `peft` | Yes | Yes | Notice | checked 2026-11-23 |
 | lightning (2.6.6) | Lightning Fabric loops for MathSpan, DocStruct, TrustGate | Apache-2.0 | PyPI `lightning` | Yes | Yes | Notice | checked 2026-11-23 |
 | trackio (0.45.1) | Experiment tracking | MIT | PyPI `trackio`; GH `gradio-app/trackio` LICENSE (copyright line is the placeholder "Your Name") | Yes | Yes | Notice | checked 2026-11-23 |
