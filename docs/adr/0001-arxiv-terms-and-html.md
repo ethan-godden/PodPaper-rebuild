@@ -1,6 +1,6 @@
 # ADR 0001: arXiv terms of use and native HTML markup
 
-- Status: Proposed (M0 check complete; owner decision 3 in PLAN.md still open and now includes residual risk R1 below)
+- Status: Accepted 2026-11-23 (owner decision 3 answered with the default, see ADR 0004; the choice between options (a) and (b) for residual risk R1 is to be confirmed before the first corpus fetch in M4)
 - Date: 2026-11-23
 - Scope: the data engine corpus (PLAN.md "Data engine", M4 and M7) and the opt-in runtime correction stage S5b
 
