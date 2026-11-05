@@ -990,6 +990,7 @@ name = "podpaper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "numpy" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "typer" },
@@ -1022,6 +1023,7 @@ requires-dist = [
     { name = "en-core-web-sm", marker = "extra == 'models'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "httpx", marker = "extra == 'models'", specifier = ">=0.28.1" },
     { name = "kokoro", marker = "extra == 'models'", specifier = ">=0.9.4" },
+    { name = "numpy", specifier = ">=2.5.5" },
     { name = "opencv-python-headless", marker = "extra == 'models'", specifier = ">=5.1.0.95" },
     { name = "pillow", marker = "extra == 'models'", specifier = ">=13.0.0" },
     { name = "pydantic", specifier = ">=2.9" },
