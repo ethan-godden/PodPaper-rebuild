@@ -6,9 +6,12 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "httpx>=0.28.1",
     "numpy>=2.5.5",
+    "pillow>=13.0.0",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "pypdfium2>=5.15.2",
     "typer>=0.15",
 ]
 
@@ -33,6 +36,7 @@ models = [
 dev = [
     "prek>=0.5.11",
     "pytest>=8",
+    "reportlab>=5.1.0",
     "ruff>=0.8",
     "ty",
 ]
