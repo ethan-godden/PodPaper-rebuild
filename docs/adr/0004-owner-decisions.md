@@ -6,7 +6,7 @@ proceeded on those defaults.
 
 | # | Decision | Default in use | What M0 did on that basis | Owner answer |
 |---|---|---|---|---|
-| 1 | Public or private repository, and licence | Private, MIT | Local repository only, no remote. `LICENSE` is MIT. Legacy fixtures are kept out of git because they name private individuals and include third-party lecture notes. | Default accepted, 2026-11-23 |
+| 1 | Public or private repository, and licence | Private, MIT | `LICENSE` is MIT. Legacy fixtures are kept out of git because they name private individuals and include third-party lecture notes. | Default accepted, 2026-11-23. Changed the same day: the owner asked for a new public GitHub repository (`ethan-godden/PodPaper-rebuild`), MIT. |
 | 2 | What "with PyTorch" binds | Every model we train is PyTorch; pretrained LLM and OCR inference may run in Ollama | Layout and speech run in PyTorch. Qwen3.8-27B and GLM-OCR run through Ollama. | Default accepted, 2026-11-23 |
 | 3 | arXiv network fetching | Allowed for the training corpus after the terms check; off at runtime unless opted in | Terms check done (ADR 0001). No corpus fetch has been run. ADR 0001 adds a sub-question: proceed on the robots.txt reading, or ask arXiv first. | Default accepted, 2026-11-23 |
 | 4 | Rented-GPU spend | Yes, capped at tens of dollars per run, after a local pilot | Nothing rented. | Default accepted, 2026-11-23 |
@@ -20,5 +20,7 @@ or ask arXiv first (option b). The record's recommendation, option (a) for the
 3,000-paper corpus in M7, is the working default. Confirm it with the owner
 before the first corpus fetch in M4; no fetch has been run.
 
-The repository stays private and local (no remote) and MIT-licensed. Legacy
-fixtures stay out of git.
+The repository is public and MIT-licensed. Legacy fixtures stay out of git, and
+must never be committed. Because the repository is public, the copyleft notes
+in `LICENSES.md` (the Kokoro speech stack loads GPL code) matter as soon as
+anything beyond source code is distributed.
